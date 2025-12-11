@@ -1,4 +1,4 @@
-import { ShoppingCart, Trash2, Plus, Minus, X, Tag } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,7 +14,7 @@ interface CartSheetProps {
 }
 
 export function CartSheet({ open, onOpenChange }: CartSheetProps) {
-  const { items, subtotal, comboDiscount, hasCombo, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -25,7 +25,6 @@ export function CartSheet({ open, onOpenChange }: CartSheetProps) {
     }).format(price);
   };
 
-  const totalAfterDiscount = subtotal - comboDiscount;
 
   const handleCheckout = () => {
     onOpenChange(false);
@@ -136,33 +135,12 @@ export function CartSheet({ open, onOpenChange }: CartSheetProps) {
             </ScrollArea>
 
             <div className="border-t border-primary/20 pt-4 space-y-3">
-              {hasCombo && (
-                <div className="flex items-center justify-between p-3 bg-green-900/30 border border-green-500/50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-5 w-5 text-green-400" />
-                    <span className="text-green-400 font-medium">Combo Vibe - 15% OFF</span>
-                  </div>
-                  <span className="text-green-400 font-bold">
-                    -{formatPrice(comboDiscount)}
-                  </span>
-                </div>
-              )}
-
               <div className="flex justify-between text-white">
                 <span>Subtotal</span>
-                <span className={hasCombo ? 'line-through text-muted-foreground' : 'font-semibold'}>
+                <span className="font-bold text-primary text-lg">
                   {formatPrice(subtotal)}
                 </span>
               </div>
-
-              {hasCombo && (
-                <div className="flex justify-between text-white">
-                  <span>Total com desconto</span>
-                  <span className="font-bold text-primary text-lg">
-                    {formatPrice(totalAfterDiscount)}
-                  </span>
-                </div>
-              )}
 
               <Separator className="bg-primary/20" />
 

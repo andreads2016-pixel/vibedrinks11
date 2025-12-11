@@ -1,6 +1,6 @@
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { ChefHat, Package, LogOut, RefreshCw, Truck, User as UserIcon, Wifi, WifiOff } from 'lucide-react';
+import { ChefHat, Package, LogOut, Truck, User as UserIcon, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -167,16 +167,6 @@ export default function Kitchen() {
             {isSSEConnected ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
             {isSSEConnected ? 'Ao Vivo' : 'Offline'}
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-primary/50 text-primary"
-            onClick={() => refetch()}
-            data-testid="button-refresh"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
           <Button
             variant="ghost"
             size="sm"

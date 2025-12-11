@@ -6,12 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import { apiRequest } from '@/lib/queryClient';
 import logoImage from '@assets/VIBE_DRINKS_1765072715257.png';
-import { NEIGHBORHOODS, DELIVERY_ZONES, DELIVERY_FEE_WARNING, type DeliveryZone } from '@shared/delivery-zones';
+import { DELIVERY_FEE_WARNING } from '@shared/delivery-zones';
 
 type Step = 'phone' | 'password' | 'register';
 
@@ -35,6 +34,50 @@ export default function Login() {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [notes, setNotes] = useState('');
+  const [isLoadingCep, setIsLoadingCep] = useState(false);
+
+  const formatCep = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 5) return numbers;
+    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
+  };
+
+  const fetchAddressByCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+
+    setIsLoadingCep(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      
+      if (data.erro) {
+        toast({ title: 'CEP nao encontrado', variant: 'destructive' });
+        return;
+      }
+
+      setStreet(data.logradouro || '');
+      setNeighborhood(data.bairro || '');
+      setCity(data.localidade || '');
+      setState(data.uf || '');
+      
+      toast({ title: 'Endereco encontrado!' });
+    } catch (error) {
+      toast({ title: 'Erro ao buscar CEP', variant: 'destructive' });
+    } finally {
+      setIsLoadingCep(false);
+    }
+  };
+
+  const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCep(e.target.value);
+    setZipCode(formatted);
+    
+    const cleanCep = formatted.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      fetchAddressByCep(cleanCep);
+    }
+  };
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -347,13 +390,19 @@ export default function Login() {
                 </Label>
                 
                 <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    placeholder="CEP"
-                    value={zipCode}
-                    onChange={(e) => setZipCode(e.target.value)}
-                    className="bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-zipcode"
-                  />
+                  <div className="relative">
+                    <Input
+                      placeholder="CEP"
+                      value={zipCode}
+                      onChange={handleCepChange}
+                      maxLength={9}
+                      className="bg-secondary border-primary/30 text-foreground"
+                      data-testid="input-zipcode"
+                    />
+                    {isLoadingCep && (
+                      <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />
+                    )}
+                  </div>
                   <Input
                     placeholder="Estado"
                     value={state}
@@ -369,31 +418,15 @@ export default function Login() {
                     data-testid="input-city"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">Digite o CEP para preencher automaticamente</p>
 
-                <Select value={neighborhood} onValueChange={setNeighborhood}>
-                  <SelectTrigger className="bg-secondary border-primary/30 text-foreground" data-testid="select-neighborhood">
-                    <SelectValue placeholder="Selecione o bairro" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-primary/20 max-h-[300px]">
-                    {(['S', 'A', 'B', 'C', 'D', 'E'] as DeliveryZone[]).map((zone) => {
-                      const zoneInfo = DELIVERY_ZONES[zone];
-                      const zoneNeighborhoods = NEIGHBORHOODS.filter(n => n.zone === zone);
-                      if (zoneNeighborhoods.length === 0) return null;
-                      return (
-                        <SelectGroup key={zone}>
-                          <SelectLabel className="text-primary font-semibold">
-                            {zoneInfo.name} - R$ {zoneInfo.fee.toFixed(2).replace('.', ',')}
-                          </SelectLabel>
-                          {zoneNeighborhoods.map((n) => (
-                            <SelectItem key={n.name} value={n.name} className="text-foreground">
-                              {n.name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                <Input
+                  placeholder="Bairro"
+                  value={neighborhood}
+                  onChange={(e) => setNeighborhood(e.target.value)}
+                  className="bg-secondary border-primary/30 text-foreground"
+                  data-testid="input-neighborhood"
+                />
                 
                 <div className="flex items-start gap-2 p-3 bg-yellow/10 border border-yellow/30 rounded-lg">
                   <AlertTriangle className="h-4 w-4 text-yellow shrink-0 mt-0.5" />

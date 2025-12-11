@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Package, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Package, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -93,15 +93,6 @@ export default function Orders() {
               {isSSEConnected ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
               {isSSEConnected ? 'Ao Vivo' : 'Atualizando...'}
             </Badge>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-primary/50 text-primary"
-              onClick={() => refetch()}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 

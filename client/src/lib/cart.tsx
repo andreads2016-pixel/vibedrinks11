@@ -9,41 +9,9 @@ interface CartContextType {
   clearCart: () => void;
   subtotal: number;
   itemCount: number;
-  comboDiscount: number;
-  hasCombo: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
-
-const COMBO_DISCOUNT_PERCENT = 0.15;
-
-function detectCombo(items: CartItem[]): { hasCombo: boolean; discount: number } {
-  const destilados = items.filter(item => item.product.productType === 'destilado');
-  const gelos = items.filter(item => item.product.productType === 'gelo');
-  const energeticos = items.filter(item => item.product.productType === 'energetico');
-
-  const hasDestilado = destilados.length > 0 && destilados.some(d => d.quantity >= 1);
-  const hasGelo = gelos.length > 0 && gelos.some(g => g.quantity >= 1);
-  const hasEnergetico = energeticos.length > 0 && energeticos.some(e => e.quantity >= 1);
-
-  if (hasDestilado && hasGelo && hasEnergetico) {
-    const destilado = destilados[0];
-    const gelo = gelos[0];
-    const energetico = energeticos[0];
-
-    const comboTotal = 
-      Number(destilado.product.salePrice) +
-      Number(gelo.product.salePrice) +
-      Number(energetico.product.salePrice);
-
-    return {
-      hasCombo: true,
-      discount: comboTotal * COMBO_DISCOUNT_PERCENT
-    };
-  }
-
-  return { hasCombo: false, discount: 0 };
-}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => {
@@ -105,8 +73,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const { hasCombo, discount: comboDiscount } = detectCombo(items);
-
   return (
     <CartContext.Provider
       value={{
@@ -117,8 +83,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         subtotal,
         itemCount,
-        comboDiscount,
-        hasCombo,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
@@ -13,7 +13,9 @@ import {
   LogOut,
   Check,
   User,
-  Package
+  Package,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,6 +55,7 @@ export default function PDV() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [changeFor, setChangeFor] = useState('');
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [manualDiscount, setManualDiscount] = useState('');
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['/api/products'],
@@ -74,6 +77,7 @@ export default function PDV() {
       setNotes('');
       setPaymentMethod(null);
       setChangeFor('');
+      setManualDiscount('');
       setIsPaymentDialogOpen(false);
     },
     onError: () => {
@@ -128,7 +132,8 @@ export default function PDV() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + Number(item.product.salePrice) * item.quantity, 0);
-  const total = subtotal;
+  const discountValue = parseFloat(manualDiscount) || 0;
+  const total = Math.max(0, subtotal - discountValue);
 
   const handleFinalizeSale = () => {
     if (cart.length === 0) {
@@ -150,6 +155,7 @@ export default function PDV() {
       status: 'accepted',
       subtotal: subtotal.toFixed(2),
       deliveryFee: '0.00',
+      discount: discountValue.toFixed(2),
       total: total.toFixed(2),
       paymentMethod,
       changeFor: paymentMethod === 'cash' && changeFor ? changeFor : null,
@@ -215,26 +221,33 @@ export default function PDV() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 mb-4">
-            <Button
-              variant={selectedCategory === null ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory(null)}
-              data-testid="button-category-all"
+          <div className="relative mb-4">
+            <div 
+              className="flex gap-2 overflow-x-auto pb-2"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
-              Todos
-            </Button>
-            {categories.map((cat) => (
               <Button
-                key={cat.id}
-                variant={selectedCategory === cat.id ? 'default' : 'outline'}
+                variant={selectedCategory === null ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedCategory(cat.id)}
-                data-testid={`button-category-${cat.id}`}
+                onClick={() => setSelectedCategory(null)}
+                className="flex-shrink-0"
+                data-testid="button-category-all"
               >
-                {cat.name}
+                Todos
               </Button>
-            ))}
+              {categories.map((cat) => (
+                <Button
+                  key={cat.id}
+                  variant={selectedCategory === cat.id ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className="flex-shrink-0 whitespace-nowrap"
+                  data-testid={`button-category-${cat.id}`}
+                >
+                  {cat.name}
+                </Button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto">
@@ -347,6 +360,28 @@ export default function PDV() {
               <span>Subtotal:</span>
               <span className="font-bold">{formatCurrency(subtotal)}</span>
             </div>
+
+            <div>
+              <Label htmlFor="discount">Desconto (R$)</Label>
+              <Input
+                id="discount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+                value={manualDiscount}
+                onChange={(e) => setManualDiscount(e.target.value)}
+                className="bg-secondary border-primary/30"
+                data-testid="input-discount"
+              />
+            </div>
+
+            {discountValue > 0 && (
+              <div className="flex justify-between text-green-400">
+                <span>Desconto:</span>
+                <span>-{formatCurrency(discountValue)}</span>
+              </div>
+            )}
 
             <div className="flex justify-between text-xl font-bold text-primary">
               <span>Total:</span>

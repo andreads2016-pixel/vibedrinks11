@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 
 **State Management:**
 - AuthContext for user authentication and session persistence
-- CartContext for shopping cart with combo discount detection (15% off for destilado + gelo + energetico bundles)
+- CartContext for shopping cart (simple product sales without combo discounts)
 - React Query for server state caching and synchronization
 - LocalStorage for client-side persistence
 
@@ -76,10 +76,12 @@ Preferred communication style: Simple, everyday language.
 - Settings (system configuration like delivery rates)
 
 **Business Logic:**
-- Combo detection: Automatically applies 15% discount when cart contains destilado + gelo + energetico
-- Dynamic delivery fee calculation: Base rate per km with minimum fee threshold
+- Manual discount: Admin can apply manual discounts on POS counter sales
+- Delivery zones: Fixed delivery fees per neighborhood zone (no per-km calculation)
+- CEP auto-fill: ViaCEP API integration for automatic address completion
 - Order status workflow management with role-based state transitions
 - Stock management with deduction on order placement
+- Real-time updates via SSE (Server-Sent Events) - no refresh buttons needed
 
 ### Data Storage Solutions
 

@@ -3877,9 +3877,6 @@ function ConfiguracoesTab() {
     const data = {
       storeAddress: formData.get('storeAddress') as string,
       pixKey: formData.get('pixKey') as string,
-      deliveryRatePerKm: formData.get('deliveryRatePerKm') as string,
-      minDeliveryFee: formData.get('minDeliveryFee') as string,
-      maxDeliveryDistance: formData.get('maxDeliveryDistance') as string,
       isOpen: formData.get('isOpen') === 'on',
     };
     updateMutation.mutate(data);
@@ -3911,39 +3908,6 @@ function ConfiguracoesTab() {
                   defaultValue={settings?.pixKey || ''} 
                   placeholder="CPF, CNPJ, email ou celular"
                   data-testid="input-pix-key"
-                />
-              </div>
-              <div>
-                <Label htmlFor="deliveryRatePerKm">Taxa por KM (R$)</Label>
-                <Input 
-                  id="deliveryRatePerKm" 
-                  name="deliveryRatePerKm" 
-                  type="number"
-                  step="0.01"
-                  defaultValue={settings?.deliveryRatePerKm || '1.25'} 
-                  data-testid="input-rate-per-km"
-                />
-              </div>
-              <div>
-                <Label htmlFor="minDeliveryFee">Taxa Minima (R$)</Label>
-                <Input 
-                  id="minDeliveryFee" 
-                  name="minDeliveryFee" 
-                  type="number"
-                  step="0.01"
-                  defaultValue={settings?.minDeliveryFee || '5.00'} 
-                  data-testid="input-min-fee"
-                />
-              </div>
-              <div>
-                <Label htmlFor="maxDeliveryDistance">Distancia Maxima (KM)</Label>
-                <Input 
-                  id="maxDeliveryDistance" 
-                  name="maxDeliveryDistance" 
-                  type="number"
-                  step="0.1"
-                  defaultValue={settings?.maxDeliveryDistance || '15'} 
-                  data-testid="input-max-distance"
                 />
               </div>
             </div>
