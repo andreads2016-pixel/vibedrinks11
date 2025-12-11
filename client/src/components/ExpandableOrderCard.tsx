@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Clock, Package, Truck, MapPin, Phone, User as UserIcon, MessageCircle, Bell, Edit2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, Package, Truck, MapPin, Phone, User as UserIcon, MessageCircle, Bell, Edit2, CreditCard, Banknote, QrCode, Wallet, FileText, Store } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Order, OrderItem, Address, Motoboy } from '@shared/schema';
@@ -30,8 +31,20 @@ function formatPhone(phone: string): string {
   return phone;
 }
 
+const PAYMENT_ICONS: Record<PaymentMethod, typeof CreditCard> = {
+  cash: Banknote,
+  pix: QrCode,
+  card_pos: CreditCard,
+  card_credit: CreditCard,
+  card_debit: Wallet,
+};
+
+interface OrderItemWithNotes extends OrderItem {
+  notes?: string;
+}
+
 interface OrderWithDetails extends Order {
-  items?: OrderItem[];
+  items?: OrderItemWithNotes[];
   userName?: string;
   userWhatsapp?: string;
   address?: Address;
@@ -124,9 +137,14 @@ export function ExpandableOrderCard({
   const paymentMethod = order.paymentMethod as PaymentMethod;
   const orderType = order.orderType as OrderType;
   const colorClass = statusColor || STATUS_COLORS[status];
+  const PaymentIcon = PAYMENT_ICONS[paymentMethod] || CreditCard;
 
   const orderId = order.id.slice(-6).toUpperCase();
   const customerName = order.customerName || order.userName || 'Cliente';
+
+  const showCustomerSection = variant !== 'customer';
+  const showAddressSection = orderType === 'delivery' && order.address;
+  const showMotoboySection = order.motoboy || (order.motoboyId && !order.motoboy) || (orderType === 'delivery' && status === 'ready' && !order.motoboyId);
 
   return (
     <Card 
@@ -169,39 +187,43 @@ export function ExpandableOrderCard({
           <CardHeader className="cursor-pointer hover-elevate py-3 px-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="flex flex-col min-w-0">
+                <div className="flex flex-col min-w-0 gap-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-foreground text-lg">#{orderId}</span>
-                    <Badge className={`${colorClass} border text-xs`}>
+                    <span className="font-bold text-foreground text-lg" data-testid={`order-id-${order.id}`}>#{orderId}</span>
+                    <Badge className={`${colorClass} border text-xs`} data-testid={`badge-status-${order.id}`}>
                       {ORDER_STATUS_LABELS[status]}
                     </Badge>
-                    {orderType && (
-                      <Badge variant="outline" className="text-xs">
-                        {orderType === 'counter' ? <UserIcon className="h-3 w-3 mr-1" /> : <Truck className="h-3 w-3 mr-1" />}
-                        {ORDER_TYPE_LABELS[orderType]}
-                      </Badge>
-                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                    <span className="truncate">{customerName}</span>
-                    <span className="text-muted-foreground/50">|</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatDate(order.createdAt)}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground" data-testid={`customer-name-${order.id}`}>
+                      {customerName}
                     </span>
+                    <span className="text-muted-foreground/50">|</span>
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-order-type-${order.id}`}>
+                      {orderType === 'counter' ? <Store className="h-3 w-3 mr-1" /> : <Truck className="h-3 w-3 mr-1" />}
+                      {ORDER_TYPE_LABELS[orderType]}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs" data-testid={`badge-payment-${order.id}`}>
+                      <PaymentIcon className="h-3 w-3 mr-1" />
+                      {PAYMENT_METHOD_LABELS[paymentMethod]}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span data-testid={`order-date-${order.id}`}>{formatDate(order.createdAt)}</span>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center gap-2 flex-shrink-0">
                 {showElapsedTime && elapsedTimeDate && (
-                  <Badge className={`${colorClass} border flex items-center gap-1`}>
+                  <Badge className={`${colorClass} border flex items-center gap-1`} data-testid={`badge-elapsed-${order.id}`}>
                     <Clock className="h-3 w-3" />
                     {getElapsedTime(elapsedTimeDate)}
                   </Badge>
                 )}
-                <span className="font-bold text-primary">{formatCurrency(order.total)}</span>
-                <Button variant="ghost" size="icon" className="h-8 w-8" data-testid={`button-toggle-${order.id}`}>
+                <span className="font-bold text-primary text-lg" data-testid={`order-total-${order.id}`}>{formatCurrency(order.total)}</span>
+                <Button variant="ghost" size="icon" data-testid={`button-toggle-${order.id}`}>
                   {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </Button>
               </div>
@@ -211,97 +233,77 @@ export function ExpandableOrderCard({
         
         <CollapsibleContent>
           <CardContent className="pt-0 pb-4 px-4 space-y-4">
-            <div className="border-t border-border pt-4">
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">Itens do Pedido</h4>
-              <div className="bg-secondary/50 rounded-lg p-3 space-y-2">
-                {order.items?.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span className="text-foreground">
-                      {item.quantity}x {item.productName}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {formatCurrency(item.totalPrice)}
-                    </span>
+            {showCustomerSection && order.userWhatsapp && (
+              <div 
+                className="bg-green-500/10 border border-green-500/30 rounded-lg p-3"
+                data-testid={`section-customer-${order.id}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500/20 rounded-full p-2">
+                      <UserIcon className="h-5 w-5 text-green-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground" data-testid={`customer-name-expanded-${order.id}`}>
+                        {customerName}
+                      </p>
+                      <p className="text-sm text-muted-foreground" data-testid={`customer-phone-${order.id}`}>
+                        {formatPhone(order.userWhatsapp)}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Subtotal:</span>
-                <span className="ml-2 text-foreground">{formatCurrency(order.subtotal)}</span>
-              </div>
-              {Number(order.discount || 0) > 0 && (
-                <div>
-                  <span className="text-green-400">Desconto:</span>
-                  <span className="ml-2 text-green-400">-{formatCurrency(order.discount || 0)}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Taxa Entrega:</span>
-                <span className="ml-2 text-foreground">{formatCurrency(order.deliveryFee)}</span>
-                {order.deliveryFeeAdjusted && (
-                  <Badge variant="outline" className="text-xs ml-1 text-yellow-400 border-yellow-400/50">Ajustada</Badge>
-                )}
-                {variant === 'admin' && onEditDeliveryFee && (
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 ml-1"
+                    variant="default"
+                    size="sm"
+                    className="bg-green-600 text-white flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setNewDeliveryFee(String(order.deliveryFee || 0));
-                      setShowFeeDialog(true);
+                      openWhatsApp(order.userWhatsapp!, `Ola! Sobre o pedido #${orderId} da Vibe Drinks...`);
                     }}
-                    data-testid={`button-edit-fee-${order.id}`}
+                    data-testid={`button-whatsapp-customer-${order.id}`}
                   >
-                    <Edit2 className="h-3 w-3" />
+                    <Phone className="h-4 w-4 mr-1" />
+                    Ligar
                   </Button>
-                )}
-              </div>
-              <div>
-                <span className="text-muted-foreground">Pagamento:</span>
-                <span className="ml-2 text-foreground">{PAYMENT_METHOD_LABELS[paymentMethod]}</span>
-              </div>
-              {paymentMethod === 'cash' && order.changeFor && Number(order.changeFor) > 0 && (
-                <div className="col-span-2">
-                  <span className="text-yellow-400">Troco para:</span>
-                  <span className="ml-2 text-yellow-400">{formatCurrency(order.changeFor)}</span>
                 </div>
-              )}
-            </div>
-
-            {order.notes && (
-              <div className="bg-yellow/10 border border-yellow/30 rounded-lg p-3">
-                <p className="text-yellow text-sm font-medium">Observacoes:</p>
-                <p className="text-foreground text-sm">{order.notes}</p>
               </div>
             )}
 
-            {order.address && (
+            {showAddressSection && order.address && (
               <div 
                 className={`bg-secondary/50 rounded-lg p-3 ${onOpenMaps ? 'cursor-pointer hover-elevate' : ''}`}
                 onClick={() => onOpenMaps && order.address && onOpenMaps(order.address)}
-                data-testid={`address-${order.id}`}
+                data-testid={`section-address-${order.id}`}
               >
-                <div className="flex items-start gap-2">
-                  <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                  <div className="text-sm">
-                    <p className="text-foreground font-medium">
+                <div className="flex items-start gap-3">
+                  <div className="bg-primary/20 rounded-full p-2 flex-shrink-0">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 text-sm space-y-1">
+                    <p className="text-foreground font-medium" data-testid={`address-street-${order.id}`}>
                       {order.address.street}, {order.address.number}
                     </p>
                     {order.address.complement && (
-                      <p className="text-muted-foreground">{order.address.complement}</p>
+                      <p className="text-muted-foreground" data-testid={`address-complement-${order.id}`}>
+                        {order.address.complement}
+                      </p>
                     )}
-                    <p className="text-muted-foreground">
-                      {order.address.neighborhood} - {order.address.city}/{order.address.state}
+                    <p data-testid={`address-neighborhood-${order.id}`}>
+                      <Badge variant="secondary" className="text-xs font-medium">
+                        {order.address.neighborhood}
+                      </Badge>
+                      <span className="text-muted-foreground ml-2">
+                        {order.address.city}/{order.address.state}
+                      </span>
                     </p>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-muted-foreground text-xs" data-testid={`address-cep-${order.id}`}>
                       CEP: {order.address.zipCode}
                     </p>
                     {order.address.notes && (
-                      <p className="text-yellow text-xs mt-1">Ref: {order.address.notes}</p>
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2 mt-2" data-testid={`address-reference-${order.id}`}>
+                        <p className="text-yellow-400 text-xs font-medium">Referencia:</p>
+                        <p className="text-foreground text-xs">{order.address.notes}</p>
+                      </div>
                     )}
                     {onOpenMaps && (
                       <p className="text-primary text-xs mt-1">Toque para abrir no Maps</p>
@@ -311,84 +313,190 @@ export function ExpandableOrderCard({
               </div>
             )}
 
-            {order.userWhatsapp && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="h-4 w-4 text-green-400" />
-                    <div className="text-sm">
-                      <span className="text-green-300">Cliente: </span>
-                      <span className="font-medium text-foreground">{customerName}</span>
-                      <span className="text-muted-foreground ml-2">{formatPhone(order.userWhatsapp)}</span>
+            <div className="border-t border-border pt-4" data-testid={`section-items-${order.id}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-medium text-muted-foreground">Itens do Pedido</h4>
+                <Badge variant="secondary" className="text-xs">{order.items?.length || 0} itens</Badge>
+              </div>
+              <div className="bg-secondary/50 rounded-lg p-3 space-y-3">
+                {order.items?.map((item, idx) => (
+                  <div key={idx} data-testid={`item-${order.id}-${idx}`}>
+                    <div className="flex justify-between items-start text-sm">
+                      <div className="flex-1">
+                        <span className="text-foreground font-medium" data-testid={`item-name-${order.id}-${idx}`}>
+                          {item.quantity}x {item.productName}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                          <span data-testid={`item-unit-price-${order.id}-${idx}`}>
+                            {formatCurrency(item.unitPrice)} un.
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-foreground font-medium" data-testid={`item-total-${order.id}-${idx}`}>
+                        {formatCurrency(item.totalPrice)}
+                      </span>
+                    </div>
+                    {item.notes && (
+                      <div className="mt-1 text-xs text-yellow-400 bg-yellow-500/10 rounded px-2 py-1" data-testid={`item-notes-${order.id}-${idx}`}>
+                        Obs: {item.notes}
+                      </div>
+                    )}
+                    {idx < (order.items?.length || 0) - 1 && (
+                      <Separator className="mt-2" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-secondary/30 rounded-lg p-3 space-y-2" data-testid={`section-payment-${order.id}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <PaymentIcon className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-medium text-muted-foreground">Pagamento</h4>
+              </div>
+              
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between" data-testid={`payment-subtotal-${order.id}`}>
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="text-foreground">{formatCurrency(order.subtotal)}</span>
+                </div>
+                
+                {Number(order.discount || 0) > 0 && (
+                  <div className="flex justify-between text-green-400" data-testid={`payment-discount-${order.id}`}>
+                    <span>Desconto</span>
+                    <span>-{formatCurrency(order.discount || 0)}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center" data-testid={`payment-delivery-fee-${order.id}`}>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Taxa de Entrega</span>
+                    {order.deliveryFeeAdjusted && (
+                      <Badge variant="outline" className="text-xs text-yellow-400 border-yellow-400/50">Ajustada</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-foreground">{formatCurrency(order.deliveryFee)}</span>
+                    {variant === 'admin' && onEditDeliveryFee && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewDeliveryFee(String(order.deliveryFee || 0));
+                          setShowFeeDialog(true);
+                        }}
+                        data-testid={`button-edit-fee-${order.id}`}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                <Separator className="my-2" />
+                
+                <div className="flex justify-between font-semibold text-base" data-testid={`payment-total-${order.id}`}>
+                  <span className="text-foreground">Total</span>
+                  <span className="text-primary">{formatCurrency(order.total)}</span>
+                </div>
+                
+                <Separator className="my-2" />
+                
+                <div className="flex items-center justify-between" data-testid={`payment-method-detail-${order.id}`}>
+                  <span className="text-muted-foreground">Forma de Pagamento</span>
+                  <Badge variant="outline" className="text-xs">
+                    <PaymentIcon className="h-3 w-3 mr-1" />
+                    {PAYMENT_METHOD_LABELS[paymentMethod]}
+                  </Badge>
+                </div>
+                
+                {paymentMethod === 'cash' && order.changeFor && Number(order.changeFor) > 0 && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2 mt-2" data-testid={`payment-change-${order.id}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-yellow-400 font-medium">Troco para</span>
+                      <span className="text-yellow-400 font-bold">{formatCurrency(order.changeFor)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs mt-1">
+                      <span className="text-muted-foreground">Troco a devolver</span>
+                      <span className="text-yellow-300">{formatCurrency(Number(order.changeFor) - Number(order.total))}</span>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-green-400 border-green-500/50 flex-shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openWhatsApp(order.userWhatsapp!, `Ola! Sobre o pedido #${orderId} da Vibe Drinks...`);
-                    }}
-                    data-testid={`button-whatsapp-customer-${order.id}`}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    WhatsApp
-                  </Button>
+                )}
+              </div>
+            </div>
+
+            {order.notes && (
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3" data-testid={`section-notes-${order.id}`}>
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="h-4 w-4 text-yellow-400" />
+                  <p className="text-yellow-400 text-sm font-medium">Observacoes do Pedido</p>
                 </div>
+                <p className="text-foreground text-sm">{order.notes}</p>
               </div>
             )}
 
-            {order.motoboy && (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Truck className="h-4 w-4 text-purple-400" />
-                    <div className="text-sm">
-                      <span className="text-purple-300">Motoboy: </span>
-                      <span className="font-medium text-foreground">{order.motoboy.name}</span>
+            {showMotoboySection && (
+              <>
+                {order.motoboy && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3" data-testid={`section-motoboy-${order.id}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-purple-500/20 rounded-full p-2">
+                          <Truck className="h-5 w-5 text-purple-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground" data-testid={`motoboy-name-${order.id}`}>
+                            {order.motoboy.name}
+                          </p>
+                          {order.motoboy.whatsapp && (
+                            <p className="text-sm text-muted-foreground" data-testid={`motoboy-phone-${order.id}`}>
+                              {formatPhone(order.motoboy.whatsapp)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                       {order.motoboy.whatsapp && (
-                        <span className="text-muted-foreground ml-2">{formatPhone(order.motoboy.whatsapp)}</span>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="bg-purple-600 text-white flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openWhatsApp(order.motoboy!.whatsapp, `Ola! Sobre o pedido #${orderId} da Vibe Drinks...`);
+                          }}
+                          data-testid={`button-whatsapp-motoboy-${order.id}`}
+                        >
+                          <Phone className="h-4 w-4 mr-1" />
+                          Ligar
+                        </Button>
                       )}
                     </div>
                   </div>
-                  {order.motoboy.whatsapp && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-purple-400 border-purple-500/50 flex-shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openWhatsApp(order.motoboy!.whatsapp, `Ola! Sobre o pedido #${orderId} da Vibe Drinks...`);
-                      }}
-                      data-testid={`button-whatsapp-motoboy-${order.id}`}
-                    >
-                      <MessageCircle className="h-4 w-4 mr-1" />
-                      WhatsApp
-                    </Button>
-                  )}
-                </div>
-              </div>
-            )}
+                )}
 
-            {order.motoboyId && !order.motoboy && (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-purple-400" />
-                  <span className="text-sm text-purple-300">Motoboy atribuido</span>
-                </div>
-              </div>
-            )}
+                {order.motoboyId && !order.motoboy && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3" data-testid={`motoboy-assigned-${order.id}`}>
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-purple-400" />
+                      <span className="text-sm text-purple-300">Motoboy atribuido</span>
+                    </div>
+                  </div>
+                )}
 
-            {orderType === 'delivery' && status === 'ready' && !order.motoboyId && (
-              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-center">
-                <Truck className="h-6 w-6 text-purple-400 mx-auto mb-1" />
-                <p className="text-purple-300 text-sm">Aguardando atribuicao de motoboy</p>
-              </div>
+                {orderType === 'delivery' && status === 'ready' && !order.motoboyId && (
+                  <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-center" data-testid={`motoboy-pending-${order.id}`}>
+                    <Truck className="h-6 w-6 text-purple-400 mx-auto mb-1" />
+                    <p className="text-purple-300 text-sm">Aguardando atribuicao de motoboy</p>
+                  </div>
+                )}
+              </>
             )}
 
             {showActions && actions && (
-              <div className="pt-2 border-t border-border">
+              <div className="pt-2 border-t border-border" data-testid={`section-actions-${order.id}`}>
                 {actions}
               </div>
             )}

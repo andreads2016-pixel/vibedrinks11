@@ -2408,19 +2408,6 @@ function ProdutosTab() {
                   onImageRemoved={() => setUploadedImageUrl(null)}
                 />
               </div>
-              <div>
-                <Label htmlFor="productType">Tipo (para combo)</Label>
-                <Select name="productType" defaultValue={editingProduct?.productType || ''}>
-                  <SelectTrigger data-testid="select-product-type">
-                    <SelectValue placeholder="Selecione (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="destilado">Destilado</SelectItem>
-                    <SelectItem value="gelo">Gelo</SelectItem>
-                    <SelectItem value="energetico">Energetico</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <Button type="submit" className="w-full" data-testid="button-submit-product">
                 {editingProduct ? 'Salvar' : 'Criar'}
               </Button>
@@ -3430,6 +3417,7 @@ function ZonasTab() {
   const [isZoneDialogOpen, setIsZoneDialogOpen] = useState(false);
   const [isNeighborhoodDialogOpen, setIsNeighborhoodDialogOpen] = useState(false);
   const [selectedZoneForNeighborhood, setSelectedZoneForNeighborhood] = useState<string>('');
+  const [neighborhoodSearchTerm, setNeighborhoodSearchTerm] = useState<string>('');
 
   const { data: zones = [], isLoading: zonesLoading } = useQuery<DeliveryZone[]>({
     queryKey: ['/api/delivery-zones'],
@@ -3534,6 +3522,7 @@ function ZonasTab() {
       name: formData.get('name') as string,
       description: formData.get('description') as string || null,
       fee: formData.get('fee') as string,
+      sortOrder: parseInt(formData.get('sortOrder') as string) || 0,
       isActive: formData.get('isActive') === 'on',
     };
 
@@ -3590,16 +3579,44 @@ function ZonasTab() {
   };
 
   const getNeighborhoodsByZone = (zoneId: string) => {
-    return neighborhoods.filter(n => n.zoneId === zoneId);
+    const zoneNeighborhoods = neighborhoods.filter(n => n.zoneId === zoneId);
+    if (!neighborhoodSearchTerm.trim()) return zoneNeighborhoods;
+    return zoneNeighborhoods.filter(n => 
+      n.name.toLowerCase().includes(neighborhoodSearchTerm.toLowerCase())
+    );
+  };
+
+  const getNeighborhoodCount = (zoneId: string) => {
+    return neighborhoods.filter(n => n.zoneId === zoneId).length;
   };
 
   const sortedZones = [...zones].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
+  const totalNeighborhoods = neighborhoods.length;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="font-serif text-3xl text-primary">Zonas de Entrega</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <h2 className="font-serif text-3xl text-primary">Zonas de Entrega</h2>
+          <Badge variant="outline" data-testid="badge-zones-count">
+            {zones.length} zonas
+          </Badge>
+          <Badge variant="outline" data-testid="badge-neighborhoods-total">
+            {totalNeighborhoods} bairros
+          </Badge>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar bairros..."
+              value={neighborhoodSearchTerm}
+              onChange={(e) => setNeighborhoodSearchTerm(e.target.value)}
+              className="pl-9 w-48 bg-secondary border-primary/30"
+              data-testid="input-search-neighborhoods"
+            />
+          </div>
           <Button onClick={openCreateZone} data-testid="button-create-zone">
             <Plus className="w-4 h-4 mr-2" />
             Nova Zona
@@ -3632,13 +3649,17 @@ function ZonasTab() {
             return (
               <Card key={zone.id} data-testid={`card-zone-${zone.id}`}>
                 <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-                  <div className="flex items-center gap-3">
-                    <Badge className={zone.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <MapPin className="w-5 h-5 text-muted-foreground" />
+                    <Badge className={zone.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'} data-testid={`badge-zone-code-${zone.id}`}>
                       {zone.code}
                     </Badge>
-                    <CardTitle className="text-lg">{zone.name}</CardTitle>
-                    <Badge variant="outline" className="text-primary border-primary">
+                    <CardTitle className="text-lg" data-testid={`text-zone-name-${zone.id}`}>{zone.name}</CardTitle>
+                    <Badge variant="outline" className="text-primary border-primary" data-testid={`badge-zone-fee-${zone.id}`}>
                       {formatCurrency(zone.fee)}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs" data-testid={`badge-zone-neighborhoods-count-${zone.id}`}>
+                      {getNeighborhoodCount(zone.id)} bairros
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3752,15 +3773,28 @@ function ZonasTab() {
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="name">Nome da Zona</Label>
-              <Input
-                id="name"
-                name="name"
-                defaultValue={editingZone?.name || ''}
-                required
-                data-testid="input-zone-name"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="name">Nome da Zona</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={editingZone?.name || ''}
+                  required
+                  data-testid="input-zone-name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="sortOrder">Ordem de Exibicao</Label>
+                <Input
+                  id="sortOrder"
+                  name="sortOrder"
+                  type="number"
+                  min="0"
+                  defaultValue={editingZone?.sortOrder ?? 0}
+                  data-testid="input-zone-sort-order"
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="description">Descricao (opcional)</Label>
@@ -3936,7 +3970,7 @@ export default function AdminDashboard() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [isSSEConnected, setIsSSEConnected] = useState(false);
-  const { playMultiple } = useNotificationSound();
+  const { playOnce, playMultiple } = useNotificationSound();
 
   useOrderUpdates({
     onConnected: () => setIsSSEConnected(true),
@@ -3946,6 +3980,16 @@ export default function AdminDashboard() {
         playMultiple(5);
       }
       toast({ title: 'Novo pedido recebido!' });
+    },
+    onOrderStatusChanged: (data) => {
+      if (data.status === 'pending') {
+        playMultiple(3);
+        toast({ title: 'Novo pedido pendente!' });
+      }
+      if (data.status === 'ready') {
+        playOnce();
+        toast({ title: 'Pedido pronto para entrega!' });
+      }
     },
   });
 

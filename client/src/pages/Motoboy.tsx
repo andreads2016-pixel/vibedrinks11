@@ -36,6 +36,10 @@ export default function MotoboyPage() {
         playOnce();
         toast({ title: 'Nova entrega disponivel!' });
       }
+      if (data.status === 'arrived') {
+        playOnce();
+        toast({ title: 'Entregador chegou ao destino!' });
+      }
     },
     onOrderAssigned: () => {
       playOnce();

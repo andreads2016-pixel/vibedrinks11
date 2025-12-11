@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/auth';
 import { useOrderUpdates } from '@/hooks/use-order-updates';
 import { useNotificationSound } from '@/hooks/use-notification-sound';
+import { useToast } from '@/hooks/use-toast';
 import { ExpandableOrderCard } from '@/components/ExpandableOrderCard';
 import type { Order, OrderItem, Motoboy } from '@shared/schema';
 
@@ -22,13 +23,23 @@ export default function Orders() {
   const { user, isAuthenticated } = useAuth();
   const [isSSEConnected, setIsSSEConnected] = useState(false);
   const { playOnce } = useNotificationSound();
+  const { toast } = useToast();
 
   useOrderUpdates({
     onConnected: () => setIsSSEConnected(true),
     onDisconnected: () => setIsSSEConnected(false),
     onOrderStatusChanged: (data) => {
-      if (data.status === 'dispatched' || data.status === 'arrived') {
+      const statusMessages: Record<string, string> = {
+        accepted: 'Seu pedido foi aceito!',
+        preparing: 'Seu pedido esta sendo preparado!',
+        dispatched: 'Seu pedido saiu para entrega!',
+        arrived: 'O entregador chegou!',
+        delivered: 'Pedido entregue com sucesso!',
+      };
+      
+      if (statusMessages[data.status]) {
         playOnce();
+        toast({ title: statusMessages[data.status] });
       }
     },
   });

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useOrderUpdates } from '@/hooks/use-order-updates';
+import { useNotificationSound } from '@/hooks/use-notification-sound';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ExpandableOrderCard } from '@/components/ExpandableOrderCard';
@@ -25,12 +26,18 @@ export default function Kitchen() {
   const { toast } = useToast();
   const { role, logout } = useAuth();
   const [isSSEConnected, setIsSSEConnected] = useState(false);
+  const { playOnce, playMultiple } = useNotificationSound();
 
   useOrderUpdates({
     onConnected: () => setIsSSEConnected(true),
     onDisconnected: () => setIsSSEConnected(false),
+    onOrderCreated: () => {
+      playMultiple(3);
+      toast({ title: 'Novo pedido recebido!' });
+    },
     onOrderStatusChanged: (data) => {
       if (data.status === 'accepted') {
+        playOnce();
         toast({ title: 'Novo pedido na fila!' });
       }
     },
