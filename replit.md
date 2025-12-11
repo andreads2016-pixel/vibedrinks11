@@ -33,12 +33,12 @@ Preferred communication style: Simple, everyday language.
 
 **Key Pages:**
 - Home: Hero video section, banner carousel, category carousel, product grid
-- Login/AdminLogin: WhatsApp-based customer auth, username/password for staff
-- Checkout: Address selection, payment method, order creation
-- Orders: Customer order tracking with status badges
-- Kitchen: Order preparation dashboard for kitchen staff
-- Motoboy: Delivery driver interface with order assignments
-- Admin Dashboard: Management interface (referenced but not implemented in provided files)
+- Login/AdminLogin: WhatsApp-based customer auth with neighborhood selection, username/password for staff
+- Checkout: Address display, neighborhood-based delivery fee calculation, payment method, order creation
+- Orders: Customer order tracking with status badges and sound notifications
+- Kitchen: Order preparation dashboard with sound alerts for new orders
+- Motoboy: Delivery driver interface with order assignments and arrival notifications
+- Admin Dashboard: Full management interface with tabs for Pedidos, Entregas, Produtos, Categorias, Clientes, Motoboys, Banners, Zonas, and Configuracoes
 
 ### Backend Architecture
 
@@ -62,6 +62,8 @@ Preferred communication style: Simple, everyday language.
 - `/api/categories` - Category management
 - `/api/orders` - Order lifecycle management
 - `/api/banners` - Promotional banner management
+- `/api/delivery-zones` - Delivery zones CRUD with fees
+- `/api/neighborhoods` - Neighborhoods CRUD linked to zones
 
 **Data Models:**
 - Users (customers, admin, kitchen, motoboy roles)
