@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { MapPin, CreditCard, Banknote, QrCode, Truck, ArrowLeft, Loader2, Copy, Check, AlertTriangle } from 'lucide-react';
+import { MapPin, CreditCard, Banknote, QrCode, Truck, ArrowLeft, Loader2, Copy, Check, AlertTriangle, ChevronDown } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import type { Settings, PaymentMethod } from '@shared/schema';
+import type { Settings, PaymentMethod, Neighborhood, DeliveryZone } from '@shared/schema';
 import { PAYMENT_METHOD_LABELS } from '@shared/schema';
-import { getDeliveryFeeByNeighborhood, getZoneByNeighborhood, DELIVERY_FEE_WARNING, DELIVERY_ZONES } from '@shared/delivery-zones';
+import { DELIVERY_FEE_WARNING } from '@shared/delivery-zones';
+import { fetchNeighborhoodsWithZones, calculateDeliveryFee, type NeighborhoodWithZone } from '@/lib/delivery-fees';
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
@@ -26,23 +28,80 @@ export default function Checkout() {
   const [needsChange, setNeedsChange] = useState(false);
   const [changeFor, setChangeFor] = useState('');
   const [pixCopied, setPixCopied] = useState(false);
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState<string>('');
+  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodWithZone[]>([]);
+  const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(true);
 
   const { data: settings } = useQuery<Settings>({
     queryKey: ['/api/settings'],
   });
 
-  const neighborhoodFee = address?.neighborhood ? getDeliveryFeeByNeighborhood(address.neighborhood) : null;
-  const zoneInfo = address?.neighborhood ? getZoneByNeighborhood(address.neighborhood) : null;
-  
-  const deliveryRate = Number(settings?.deliveryRatePerKm ?? 1.25);
-  const minDeliveryFee = Number(settings?.minDeliveryFee ?? 5);
-  const estimatedDistance = 5;
-  const fallbackDeliveryFee = Math.max(estimatedDistance * deliveryRate, minDeliveryFee);
-  
-  const deliveryFee = neighborhoodFee ?? fallbackDeliveryFee;
-  const isUnlistedNeighborhood = neighborhoodFee === null;
+  useEffect(() => {
+    const loadNeighborhoods = async () => {
+      setIsLoadingNeighborhoods(true);
+      const data = await fetchNeighborhoodsWithZones();
+      setNeighborhoods(data);
+      setIsLoadingNeighborhoods(false);
+    };
+    loadNeighborhoods();
+  }, []);
+
+  useEffect(() => {
+    if (address?.neighborhood && neighborhoods.length > 0) {
+      const match = neighborhoods.find(
+        n => n.name.toLowerCase() === address.neighborhood.toLowerCase()
+      );
+      if (match) {
+        setSelectedNeighborhood(match.id);
+      }
+    }
+  }, [address, neighborhoods]);
+
+  const deliveryFeeResult = useMemo(() => {
+    const neighborhoodToUse = selectedNeighborhood
+      ? neighborhoods.find(n => n.id === selectedNeighborhood)?.name
+      : address?.neighborhood;
+    
+    if (!neighborhoodToUse) {
+      return {
+        fee: Number(settings?.minDeliveryFee ?? 19.90),
+        zoneName: null,
+        zoneCode: null,
+        isFromDatabase: false,
+        isUnlisted: true
+      };
+    }
+
+    const fallbackFee = Number(settings?.minDeliveryFee ?? 19.90);
+    return calculateDeliveryFee(neighborhoodToUse, neighborhoods, fallbackFee);
+  }, [selectedNeighborhood, address, neighborhoods, settings]);
+
+  const deliveryFee = deliveryFeeResult.fee;
+  const isUnlistedNeighborhood = deliveryFeeResult.isUnlisted;
+  const zoneInfo = deliveryFeeResult.zoneName ? {
+    name: deliveryFeeResult.zoneName,
+    fee: deliveryFeeResult.fee
+  } : null;
   
   const total = subtotal + deliveryFee;
+
+  const groupedNeighborhoods = useMemo(() => {
+    const grouped = new Map<string, { zone: DeliveryZone; neighborhoods: NeighborhoodWithZone[] }>();
+    
+    for (const n of neighborhoods) {
+      if (!n.zone) continue;
+      
+      const key = n.zone.id;
+      if (!grouped.has(key)) {
+        grouped.set(key, { zone: n.zone, neighborhoods: [] });
+      }
+      grouped.get(key)!.neighborhoods.push(n);
+    }
+    
+    return Array.from(grouped.values()).sort((a, b) => 
+      (a.zone.sortOrder ?? 0) - (b.zone.sortOrder ?? 0)
+    );
+  }, [neighborhoods]);
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -58,7 +117,7 @@ export default function Checkout() {
         })),
         subtotal,
         deliveryFee,
-        deliveryDistance: estimatedDistance,
+        deliveryDistance: 0,
         discount: 0,
         total,
         paymentMethod,
@@ -141,17 +200,65 @@ export default function Checkout() {
                   {address.notes && (
                     <p className="text-yellow text-sm mt-2">Obs: {address.notes}</p>
                   )}
-                  {zoneInfo && (
-                    <p className="text-primary text-sm mt-2 font-medium">
-                      Zona de entrega: {zoneInfo.name} - {formatPrice(zoneInfo.fee)}
-                    </p>
-                  )}
-                  {isUnlistedNeighborhood && (
-                    <p className="text-muted-foreground text-sm mt-2">
-                      Taxa estimada (bairro nao cadastrado)
-                    </p>
+                </div>
+                
+                <div className="mt-4">
+                  <Label className="text-foreground text-sm mb-2 block">
+                    Confirmar bairro para calculo da taxa
+                  </Label>
+                  {isLoadingNeighborhoods ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando bairros...
+                    </div>
+                  ) : (
+                    <Select
+                      value={selectedNeighborhood}
+                      onValueChange={setSelectedNeighborhood}
+                    >
+                      <SelectTrigger 
+                        className="bg-secondary border-primary/30"
+                        data-testid="select-neighborhood-checkout"
+                      >
+                        <SelectValue placeholder="Selecione seu bairro" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groupedNeighborhoods.map(({ zone, neighborhoods: zoneNeighborhoods }) => (
+                          <div key={zone.id}>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
+                              {zone.name} - {formatPrice(Number(zone.fee))}
+                            </div>
+                            {zoneNeighborhoods.map((n) => (
+                              <SelectItem 
+                                key={n.id} 
+                                value={n.id}
+                                data-testid={`option-neighborhood-${n.id}`}
+                              >
+                                {n.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
+
+                {zoneInfo && (
+                  <div className="mt-3 p-2 bg-primary/10 rounded-lg">
+                    <p className="text-primary text-sm font-medium" data-testid="text-zone-info">
+                      Zona: {zoneInfo.name} - Taxa: {formatPrice(zoneInfo.fee)}
+                    </p>
+                  </div>
+                )}
+
+                {isUnlistedNeighborhood && (
+                  <div className="mt-3 p-2 bg-yellow/10 rounded-lg">
+                    <p className="text-muted-foreground text-sm" data-testid="text-unlisted-warning">
+                      Bairro nao cadastrado - taxa estimada
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex items-start gap-2 p-3 mt-3 bg-yellow/10 border border-yellow/30 rounded-lg">
                   <AlertTriangle className="h-4 w-4 text-yellow shrink-0 mt-0.5" />
@@ -305,8 +412,13 @@ export default function Checkout() {
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Truck className="h-3 w-3" />
                       Taxa de entrega
+                      {isUnlistedNeighborhood && (
+                        <span className="text-yellow text-xs">(estimada)</span>
+                      )}
                     </span>
-                    <span className="text-foreground">{formatPrice(deliveryFee)}</span>
+                    <span className="text-foreground" data-testid="text-delivery-fee">
+                      {formatPrice(deliveryFee)}
+                    </span>
                   </div>
                 </div>
 
@@ -314,7 +426,9 @@ export default function Checkout() {
 
                 <div className="flex justify-between">
                   <span className="font-semibold text-foreground">Total</span>
-                  <span className="font-bold text-xl text-primary">{formatPrice(total)}</span>
+                  <span className="font-bold text-xl text-primary" data-testid="text-total">
+                    {formatPrice(total)}
+                  </span>
                 </div>
 
                 <Button

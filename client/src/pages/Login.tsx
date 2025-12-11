@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { Phone, User, MapPin, ArrowRight, Loader2, Lock, AlertTriangle } from 'lucide-react';
+import { Phone, User, MapPin, ArrowRight, Loader2, Lock, AlertTriangle, ChevronDown, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import { apiRequest } from '@/lib/queryClient';
 import logoImage from '@assets/VIBE_DRINKS_1765072715257.png';
 import { DELIVERY_FEE_WARNING } from '@shared/delivery-zones';
+import { fetchNeighborhoodsWithZones, type NeighborhoodWithZone } from '@/lib/delivery-fees';
+import type { DeliveryZone } from '@shared/schema';
 
 type Step = 'phone' | 'password' | 'register';
 
@@ -30,11 +33,43 @@ export default function Login() {
   const [number, setNumber] = useState('');
   const [complement, setComplement] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [notes, setNotes] = useState('');
   const [isLoadingCep, setIsLoadingCep] = useState(false);
+  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodWithZone[]>([]);
+  const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(true);
+  const [neighborhoodSearchQuery, setNeighborhoodSearchQuery] = useState('');
+
+  useEffect(() => {
+    const loadNeighborhoods = async () => {
+      setIsLoadingNeighborhoods(true);
+      const data = await fetchNeighborhoodsWithZones();
+      setNeighborhoods(data);
+      setIsLoadingNeighborhoods(false);
+    };
+    loadNeighborhoods();
+  }, []);
+
+  const groupedNeighborhoods = useMemo(() => {
+    const grouped = new Map<string, { zone: DeliveryZone; neighborhoods: NeighborhoodWithZone[] }>();
+    
+    for (const n of neighborhoods) {
+      if (!n.zone) continue;
+      
+      const key = n.zone.id;
+      if (!grouped.has(key)) {
+        grouped.set(key, { zone: n.zone, neighborhoods: [] });
+      }
+      grouped.get(key)!.neighborhoods.push(n);
+    }
+    
+    return Array.from(grouped.values()).sort((a, b) => 
+      (a.zone.sortOrder ?? 0) - (b.zone.sortOrder ?? 0)
+    );
+  }, [neighborhoods]);
 
   const formatCep = (value: string) => {
     const numbers = value.replace(/\D/g, '');
@@ -57,9 +92,22 @@ export default function Login() {
       }
 
       setStreet(data.logradouro || '');
-      setNeighborhood(data.bairro || '');
       setCity(data.localidade || '');
       setState(data.uf || '');
+      
+      if (data.bairro) {
+        const matchingNeighborhood = neighborhoods.find(
+          n => n.name.toLowerCase() === data.bairro.toLowerCase()
+        );
+        
+        if (matchingNeighborhood) {
+          setSelectedNeighborhoodId(matchingNeighborhood.id);
+          setNeighborhood(matchingNeighborhood.name);
+        } else {
+          setNeighborhood(data.bairro);
+          setSelectedNeighborhoodId('');
+        }
+      }
       
       toast({ title: 'Endereco encontrado!' });
     } catch (error) {
@@ -76,6 +124,14 @@ export default function Login() {
     const cleanCep = formatted.replace(/\D/g, '');
     if (cleanCep.length === 8) {
       fetchAddressByCep(cleanCep);
+    }
+  };
+
+  const handleNeighborhoodSelect = (neighborhoodId: string) => {
+    setSelectedNeighborhoodId(neighborhoodId);
+    const selected = neighborhoods.find(n => n.id === neighborhoodId);
+    if (selected) {
+      setNeighborhood(selected.name);
     }
   };
 
@@ -239,6 +295,13 @@ export default function Login() {
       case 'password': return 'Digite sua senha de 6 digitos';
       case 'register': return 'Complete seu cadastro para fazer pedidos';
     }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
   };
 
   return (
@@ -435,13 +498,65 @@ export default function Login() {
                 </div>
                 <p className="text-xs text-muted-foreground">Digite o CEP para preencher automaticamente</p>
 
-                <Input
-                  placeholder="Bairro"
-                  value={neighborhood}
-                  onChange={(e) => setNeighborhood(e.target.value)}
-                  className="bg-secondary border-primary/30 text-foreground"
-                  data-testid="input-neighborhood"
-                />
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Bairro</Label>
+                  {isLoadingNeighborhoods ? (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm p-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Carregando bairros...
+                    </div>
+                  ) : (
+                    <>
+                      <Select
+                        value={selectedNeighborhoodId}
+                        onValueChange={handleNeighborhoodSelect}
+                      >
+                        <SelectTrigger 
+                          className="bg-secondary border-primary/30"
+                          data-testid="select-neighborhood-register"
+                        >
+                          <SelectValue placeholder="Selecione seu bairro" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groupedNeighborhoods.map(({ zone, neighborhoods: zoneNeighborhoods }) => (
+                            <div key={zone.id}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
+                                {zone.name} - {formatPrice(Number(zone.fee))}
+                              </div>
+                              {zoneNeighborhoods.map((n) => (
+                                <SelectItem 
+                                  key={n.id} 
+                                  value={n.id}
+                                  data-testid={`option-neighborhood-register-${n.id}`}
+                                >
+                                  {n.name}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!selectedNeighborhoodId && neighborhood && (
+                        <p className="text-xs text-yellow flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Bairro "{neighborhood}" nao encontrado na lista
+                        </p>
+                      )}
+                      {!selectedNeighborhoodId && (
+                        <Input
+                          placeholder="Ou digite o nome do bairro"
+                          value={neighborhood}
+                          onChange={(e) => {
+                            setNeighborhood(e.target.value);
+                            setSelectedNeighborhoodId('');
+                          }}
+                          className="bg-secondary border-primary/30 text-foreground"
+                          data-testid="input-neighborhood-manual"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
                 
                 <div className="flex items-start gap-2 p-3 bg-yellow/10 border border-yellow/30 rounded-lg">
                   <AlertTriangle className="h-4 w-4 text-yellow shrink-0 mt-0.5" />
