@@ -83,10 +83,10 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0",
-    "esbuild": "^0.24.0"
+    "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
+    "esbuild": "^0.24.0",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
