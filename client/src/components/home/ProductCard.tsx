@@ -63,7 +63,7 @@ export function ProductCard({ product }: ProductCardProps) {
           </p>
         )}
 
-        <div className="flex items-center justify-between gap-2 mt-auto">
+        <div className="flex flex-col gap-2 mt-auto">
           <span 
             className="text-xl font-bold text-yellow"
             data-testid={`text-product-price-${product.id}`}
@@ -71,48 +71,50 @@ export function ProductCard({ product }: ProductCardProps) {
             {formatPrice(product.salePrice)}
           </span>
 
-          {isOutOfStock ? (
-            <Button variant="secondary" size="sm" disabled>
-              Indisponivel
-            </Button>
-          ) : quantity > 0 ? (
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-primary text-primary"
-                onClick={() => updateQuantity(product.id, quantity - 1)}
-                data-testid={`button-decrease-${product.id}`}
-              >
-                <Minus className="h-4 w-4" />
+          <div className="flex items-center justify-center">
+            {isOutOfStock ? (
+              <Button variant="secondary" size="sm" disabled className="w-full">
+                Indisponivel
               </Button>
-              <span 
-                className="w-8 text-center font-semibold text-card-foreground"
-                data-testid={`text-quantity-${product.id}`}
-              >
-                {quantity}
-              </span>
+            ) : quantity > 0 ? (
+              <div className="flex items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-primary text-primary flex-shrink-0"
+                  onClick={() => updateQuantity(product.id, quantity - 1)}
+                  data-testid={`button-decrease-${product.id}`}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span 
+                  className="w-8 text-center font-semibold text-card-foreground"
+                  data-testid={`text-quantity-${product.id}`}
+                >
+                  {quantity}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="border-primary text-primary flex-shrink-0"
+                  onClick={() => addItem(product)}
+                  data-testid={`button-increase-${product.id}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
               <Button
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 border-primary text-primary"
+                size="sm"
+                className="bg-primary text-primary-foreground w-full"
                 onClick={() => addItem(product)}
-                data-testid={`button-increase-${product.id}`}
+                data-testid={`button-add-${product.id}`}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-4 w-4 mr-1" />
+                Adicionar
               </Button>
-            </div>
-          ) : (
-            <Button
-              size="sm"
-              className="bg-primary text-primary-foreground"
-              onClick={() => addItem(product)}
-              data-testid={`button-add-${product.id}`}
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </Card>

@@ -151,12 +151,12 @@ export default function Kitchen() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-black border-b border-primary/20 py-4 px-6 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <ChefHat className="h-8 w-8 text-primary" />
-          <h1 className="font-serif text-2xl text-primary">Cozinha - KDE</h1>
+      <header className="bg-black border-b border-primary/20 py-4 px-4 md:px-6 flex flex-wrap items-center justify-between gap-2 sticky top-0 z-50">
+        <div className="flex items-center gap-2 md:gap-3">
+          <ChefHat className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+          <h1 className="font-serif text-lg md:text-2xl text-primary">Cozinha</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <Badge 
             className={isSSEConnected 
               ? "bg-green-500/20 text-green-400 border-green-500/30" 
@@ -165,17 +165,16 @@ export default function Kitchen() {
             data-testid="badge-connection-status"
           >
             {isSSEConnected ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
-            {isSSEConnected ? 'Ao Vivo' : 'Offline'}
+            <span className="hidden sm:inline">{isSSEConnected ? 'Ao Vivo' : 'Offline'}</span>
           </Badge>
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             className="text-muted-foreground"
             onClick={handleLogout}
             data-testid="button-logout"
           >
-            <LogOut className="h-4 w-4 mr-2" />
-            Sair
+            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>

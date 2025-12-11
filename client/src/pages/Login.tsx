@@ -80,10 +80,11 @@ export default function Login() {
   };
 
   const formatPhone = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
+    const numbers = value.replace(/\D/g, '').slice(0, 11);
     if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+    if (numbers.length <= 3) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
+    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3)}`;
+    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 3)} ${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
   };
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,8 +98,8 @@ export default function Login() {
 
   const handleCheckPhone = async () => {
     const cleanPhone = whatsapp.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      toast({ title: 'Numero invalido', description: 'Digite um numero de WhatsApp valido', variant: 'destructive' });
+    if (cleanPhone.length !== 11) {
+      toast({ title: 'Numero invalido', description: 'Digite DDD + 9 + numero (11 digitos)', variant: 'destructive' });
       return;
     }
 
@@ -263,7 +264,7 @@ export default function Login() {
                   <Input
                     id="whatsapp"
                     type="tel"
-                    placeholder="(00) 00000-0000"
+                    placeholder="(11) 9 1234-5678"
                     value={whatsapp}
                     onChange={handlePhoneChange}
                     className="pl-10 bg-secondary border-primary/30 text-foreground"
@@ -344,6 +345,20 @@ export default function Login() {
                   )}
                 </Button>
               </div>
+
+              <Button
+                variant="link"
+                className="w-full text-muted-foreground text-sm"
+                onClick={() => {
+                  toast({ 
+                    title: 'Recuperar Senha', 
+                    description: 'Entre em contato com a loja via WhatsApp para solicitar uma nova senha.'
+                  });
+                }}
+                data-testid="button-forgot-password"
+              >
+                Esqueci minha senha
+              </Button>
             </>
           )}
 

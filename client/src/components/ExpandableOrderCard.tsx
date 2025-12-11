@@ -22,7 +22,7 @@ function openWhatsApp(phone: string, message?: string) {
 function formatPhone(phone: string): string {
   const clean = phone.replace(/\D/g, '');
   if (clean.length === 11) {
-    return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 3)} ${clean.slice(3, 7)}-${clean.slice(7)}`;
   }
   if (clean.length === 10) {
     return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
@@ -291,12 +291,15 @@ export function ExpandableOrderCard({
                     <p className="text-foreground font-medium">
                       {order.address.street}, {order.address.number}
                     </p>
-                    <p className="text-muted-foreground">
-                      {order.address.neighborhood}, {order.address.city}
-                    </p>
                     {order.address.complement && (
                       <p className="text-muted-foreground">{order.address.complement}</p>
                     )}
+                    <p className="text-muted-foreground">
+                      {order.address.neighborhood} - {order.address.city}/{order.address.state}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      CEP: {order.address.zipCode}
+                    </p>
                     {order.address.notes && (
                       <p className="text-yellow text-xs mt-1">Ref: {order.address.notes}</p>
                     )}

@@ -39,7 +39,6 @@ import {
   Wifi,
   WifiOff,
   Search,
-  GripVertical,
   FileText,
   Download,
   Warehouse,
@@ -47,9 +46,6 @@ import {
   TrendingUp,
   BarChart3
 } from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useRef} from 'react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -1595,6 +1591,52 @@ function ClientesTab() {
     },
   });
 
+  const [resetPasswordData, setResetPasswordData] = useState<{ user: User; password: string } | null>(null);
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      return apiRequest('PATCH', `/api/users/${userId}`, { password: newPassword });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      toast({ title: 'Senha resetada com sucesso!' });
+    },
+    onError: () => {
+      toast({ title: 'Erro ao resetar senha', variant: 'destructive' });
+      setResetPasswordData(null);
+    },
+  });
+
+  const handleResetPassword = (user: User) => {
+    const newPassword = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    setResetPasswordData({ user, password: newPassword });
+  };
+
+  const confirmResetPassword = () => {
+    if (resetPasswordData) {
+      resetPasswordMutation.mutate({ 
+        userId: resetPasswordData.user.id, 
+        newPassword: resetPasswordData.password 
+      });
+    }
+  };
+
+  const copyPasswordToClipboard = async () => {
+    if (resetPasswordData) {
+      const message = `Ola ${resetPasswordData.user.name}!\n\nSua nova senha da Vibe Drinks e: ${resetPasswordData.password}\n\nGuarde com seguranca!`;
+      await navigator.clipboard.writeText(message);
+      toast({ title: 'Mensagem copiada!', description: 'Cole no WhatsApp do cliente.' });
+    }
+  };
+
+  const openClientWhatsApp = () => {
+    if (resetPasswordData) {
+      const cleanPhone = resetPasswordData.user.whatsapp.replace(/\D/g, '');
+      const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+      window.open(`https://wa.me/${formattedPhone}`, '_blank');
+    }
+  };
+
   const customers = users.filter(u => u.role === 'customer');
 
   const filteredCustomers = customers.filter(customer => {
@@ -1715,6 +1757,16 @@ function ClientesTab() {
                               data-testid={`button-view-customer-${user.id}`}
                             >
                               <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleResetPassword(user)}
+                              disabled={resetPasswordMutation.isPending}
+                              title="Resetar senha"
+                              data-testid={`button-reset-password-${user.id}`}
+                            >
+                              <Key className="h-4 w-4" />
                             </Button>
                             <Button 
                               size="sm" 
@@ -1922,11 +1974,71 @@ function ClientesTab() {
           )}
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!resetPasswordData} onOpenChange={() => setResetPasswordData(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-primary" />
+              Resetar Senha
+            </DialogTitle>
+          </DialogHeader>
+
+          {resetPasswordData && (
+            <div className="space-y-4">
+              <div className="bg-secondary/50 rounded-lg p-4 text-center">
+                <p className="text-sm text-muted-foreground mb-1">Nova senha para</p>
+                <p className="font-semibold text-lg">{resetPasswordData.user.name}</p>
+                <p className="text-xs text-muted-foreground">{resetPasswordData.user.whatsapp}</p>
+              </div>
+
+              <div className="bg-primary/10 rounded-lg p-4 text-center">
+                <p className="text-xs text-muted-foreground mb-2">Nova senha</p>
+                <p className="font-mono text-3xl font-bold tracking-wider text-primary">
+                  {resetPasswordData.password}
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={() => {
+                    confirmResetPassword();
+                    copyPasswordToClipboard();
+                    openClientWhatsApp();
+                  }}
+                  disabled={resetPasswordMutation.isPending}
+                  data-testid="button-confirm-reset-whatsapp"
+                >
+                  Resetar, Copiar e Abrir WhatsApp
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    confirmResetPassword();
+                    copyPasswordToClipboard();
+                  }}
+                  disabled={resetPasswordMutation.isPending}
+                  data-testid="button-confirm-reset-only"
+                >
+                  Resetar e Copiar Mensagem
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setResetPasswordData(null)}
+                  data-testid="button-cancel-reset"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function SortableProductItem({ 
+function ProductItem({ 
   product, 
   category,
   onEdit, 
@@ -1939,38 +2051,12 @@ function SortableProductItem({
   onDelete: (id: string) => void;
   formatCurrency: (value: number | string) => string;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: product.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
   return (
     <Card 
-      ref={setNodeRef} 
-      style={style}
-      className={isDragging ? 'z-50' : ''}
       data-testid={`card-product-${product.id}`}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted mt-1 flex-shrink-0"
-            data-testid={`drag-handle-product-${product.id}`}
-          >
-            <GripVertical className="w-5 h-5 text-muted-foreground" />
-          </div>
           {product.imageUrl ? (
             <img src={product.imageUrl} alt={product.name} className="w-16 h-16 object-contain rounded-lg bg-white/10 flex-shrink-0" />
           ) : (
@@ -1987,11 +2073,6 @@ function SortableProductItem({
               <Badge className={product.isActive ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}>
                 {product.isActive ? 'Ativo' : 'Inativo'}
               </Badge>
-              {product.productType && (
-                <Badge className="bg-primary/20 text-primary">
-                  {product.productType}
-                </Badge>
-              )}
             </div>
           </div>
         </div>
@@ -2052,6 +2133,8 @@ function ProdutosTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [isImporting, setIsImporting] = useState(false);
+  const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'price-asc' | 'price-desc'>('name-asc');
+  const [gridCols, setGridCols] = useState<1 | 2 | 4>(2);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -2113,17 +2196,6 @@ function ProdutosTab() {
     queryKey: ['/api/categories'],
   });
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Product>) => {
       return apiRequest('POST', '/api/products', data);
@@ -2156,45 +2228,6 @@ function ProdutosTab() {
       toast({ title: 'Produto excluido!' });
     },
   });
-
-  const reorderMutation = useMutation({
-    mutationFn: async (data: { items: { id: string; sortOrder: number }[]; previousData: Product[] }) => {
-      return apiRequest('PATCH', '/api/products/reorder', { items: data.items });
-    },
-    onError: (_error, variables) => {
-      queryClient.setQueryData(['/api/products'], variables.previousData);
-      toast({ title: 'Erro ao reordenar', variant: 'destructive' });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-    },
-  });
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    if (over && active.id !== over.id && !reorderMutation.isPending) {
-      const currentProducts = queryClient.getQueryData<Product[]>(['/api/products']) ?? [];
-      const previousData = [...currentProducts];
-      
-      const oldIndex = currentProducts.findIndex((p) => p.id === active.id);
-      const newIndex = currentProducts.findIndex((p) => p.id === over.id);
-      
-      const reordered = arrayMove([...currentProducts], oldIndex, newIndex).map((prod, index) => ({
-        ...prod,
-        sortOrder: index + 1,
-      }));
-      
-      queryClient.setQueryData(['/api/products'], reordered);
-      
-      const items = reordered.map((prod) => ({
-        id: prod.id,
-        sortOrder: prod.sortOrder ?? 0,
-      }));
-      
-      reorderMutation.mutate({ items, previousData });
-    }
-  };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2421,6 +2454,50 @@ function ProdutosTab() {
         </Select>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Ordenar:</span>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+            <SelectTrigger className="w-[140px]" data-testid="select-sort-products">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">A-Z</SelectItem>
+              <SelectItem value="name-desc">Z-A</SelectItem>
+              <SelectItem value="price-asc">Menor preco</SelectItem>
+              <SelectItem value="price-desc">Maior preco</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-sm text-muted-foreground mr-2">Colunas:</span>
+          <Button
+            variant={gridCols === 1 ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setGridCols(1)}
+            data-testid="button-grid-1"
+          >
+            1
+          </Button>
+          <Button
+            variant={gridCols === 2 ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setGridCols(2)}
+            data-testid="button-grid-2"
+          >
+            2
+          </Button>
+          <Button
+            variant={gridCols === 4 ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setGridCols(4)}
+            data-testid="button-grid-4"
+          >
+            4
+          </Button>
+        </div>
+      </div>
+
       {(() => {
         const filteredProducts = products.filter(product => {
           const matchesSearch = searchTerm === '' || 
@@ -2430,37 +2507,47 @@ function ProdutosTab() {
           return matchesSearch && matchesCategory;
         });
 
+        const sortedProducts = [...filteredProducts].sort((a, b) => {
+          switch (sortBy) {
+            case 'name-asc':
+              return a.name.localeCompare(b.name);
+            case 'name-desc':
+              return b.name.localeCompare(a.name);
+            case 'price-asc':
+              return parseFloat(a.salePrice) - parseFloat(b.salePrice);
+            case 'price-desc':
+              return parseFloat(b.salePrice) - parseFloat(a.salePrice);
+            default:
+              return 0;
+          }
+        });
+
+        const gridClass = gridCols === 1 
+          ? 'grid-cols-1' 
+          : gridCols === 2 
+            ? 'grid-cols-1 md:grid-cols-2' 
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+
         return (
           <>
             <p className="text-sm text-muted-foreground">
-              {filteredProducts.length} {filteredProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
+              {sortedProducts.length} {sortedProducts.length === 1 ? 'produto encontrado' : 'produtos encontrados'}
             </p>
-            <DndContext 
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext 
-                items={filteredProducts.map(p => p.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredProducts.map(product => {
-                    const category = categories.find(c => c.id === product.categoryId);
-                    return (
-                      <SortableProductItem
-                        key={product.id}
-                        product={product}
-                        category={category}
-                        onEdit={handleOpenDialog}
-                        onDelete={(id) => deleteMutation.mutate(id)}
-                        formatCurrency={formatCurrency}
-                      />
-                    );
-                  })}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <div className={`grid gap-4 ${gridClass}`}>
+              {sortedProducts.map(product => {
+                const category = categories.find(c => c.id === product.categoryId);
+                return (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    category={category}
+                    onEdit={handleOpenDialog}
+                    onDelete={(id) => deleteMutation.mutate(id)}
+                    formatCurrency={formatCurrency}
+                  />
+                );
+              })}
+            </div>
           </>
         );
       })()}
@@ -2468,7 +2555,7 @@ function ProdutosTab() {
   );
 }
 
-function SortableCategoryItem({ 
+function CategoryItem({ 
   category, 
   productCount,
   onEdit, 
@@ -2481,47 +2568,17 @@ function SortableCategoryItem({
   onDelete: (id: string) => void;
   onView: (cat: Category) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: category.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
   const IconComponent = getCategoryIcon(category.iconUrl);
 
   return (
-    <Card 
-      ref={setNodeRef} 
-      style={style}
-      className={isDragging ? 'z-50' : ''}
-      data-testid={`card-category-${category.id}`}
-    >
+    <Card data-testid={`card-category-${category.id}`}>
       <CardContent className="p-4 flex items-center gap-4">
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted"
-          data-testid={`drag-handle-category-${category.id}`}
-        >
-          <GripVertical className="w-5 h-5 text-muted-foreground" />
-        </div>
         <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
           <IconComponent className="w-6 h-6 text-primary" />
         </div>
         <div className="flex-1">
           <h3 className="font-semibold">{category.name}</h3>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Ordem: {category.sortOrder}</span>
-            <span>|</span>
             <span>{productCount} produto{productCount !== 1 ? 's' : ''}</span>
           </div>
         </div>
@@ -2580,17 +2637,6 @@ function CategoriasTab() {
     return products.filter(p => p.categoryId === categoryId);
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Category>) => {
       return apiRequest('POST', '/api/categories', data);
@@ -2647,45 +2693,6 @@ function CategoriasTab() {
     setIsViewDialogOpen(true);
   };
 
-  const reorderMutation = useMutation({
-    mutationFn: async (data: { items: { id: string; sortOrder: number }[]; previousData: Category[] }) => {
-      return apiRequest('PATCH', '/api/categories/reorder', { items: data.items });
-    },
-    onError: (_error, variables) => {
-      queryClient.setQueryData(['/api/categories'], variables.previousData);
-      toast({ title: 'Erro ao reordenar', variant: 'destructive' });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
-    },
-  });
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    if (over && active.id !== over.id && !reorderMutation.isPending) {
-      const currentCategories = queryClient.getQueryData<Category[]>(['/api/categories']) ?? [];
-      const previousData = [...currentCategories];
-      
-      const oldIndex = currentCategories.findIndex((c) => c.id === active.id);
-      const newIndex = currentCategories.findIndex((c) => c.id === over.id);
-      
-      const reordered = arrayMove([...currentCategories], oldIndex, newIndex).map((cat, index) => ({
-        ...cat,
-        sortOrder: index + 1,
-      }));
-      
-      queryClient.setQueryData(['/api/categories'], reordered);
-      
-      const items = reordered.map((cat) => ({
-        id: cat.id,
-        sortOrder: cat.sortOrder ?? 0,
-      }));
-      
-      reorderMutation.mutate({ items, previousData });
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -2713,12 +2720,14 @@ function CategoriasTab() {
     setIsDialogOpen(true);
   };
 
+  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="font-serif text-3xl text-primary">Categorias</h2>
-          <p className="text-sm text-muted-foreground mt-1">Arraste para reordenar</p>
+          <p className="text-sm text-muted-foreground mt-1">{categories.length} categorias (A-Z)</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -2763,10 +2772,6 @@ function CategoriasTab() {
                   Selecionado: {CATEGORY_ICONS.find(i => i.id === selectedIcon)?.name || 'Agua'}
                 </p>
               </div>
-              <div>
-                <Label htmlFor="sortOrder">Ordem</Label>
-                <Input id="sortOrder" name="sortOrder" type="number" defaultValue={editingCategory?.sortOrder || 0} data-testid="input-category-order" />
-              </div>
               <Button type="submit" className="w-full" data-testid="button-submit-category">
                 {editingCategory ? 'Salvar' : 'Criar'}
               </Button>
@@ -2775,29 +2780,18 @@ function CategoriasTab() {
         </Dialog>
       </div>
 
-      <DndContext 
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext 
-          items={categories.map(c => c.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {categories.map(category => (
-              <SortableCategoryItem
-                key={category.id}
-                category={category}
-                productCount={getProductCountByCategory(category.id)}
-                onEdit={(cat) => handleOpenCategoryDialog(cat)}
-                onDelete={(id) => deleteMutation.mutate(id)}
-                onView={handleViewCategory}
-              />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {sortedCategories.map(category => (
+          <CategoryItem
+            key={category.id}
+            category={category}
+            productCount={getProductCountByCategory(category.id)}
+            onEdit={(cat) => handleOpenCategoryDialog(cat)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onView={handleViewCategory}
+          />
+        ))}
+      </div>
 
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
