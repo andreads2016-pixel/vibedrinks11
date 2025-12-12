@@ -2321,6 +2321,21 @@ function ProdutosTab() {
             <FileText className="w-4 h-4 mr-2" />
             {isImporting ? 'Importando...' : 'Importar CSV'}
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const link = document.createElement('a');
+              link.href = '/api/products/export-csv';
+              link.download = 'produtos.csv';
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+            data-testid="button-export-csv"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar CSV
+          </Button>
           <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
             <DialogTrigger asChild>
               <Button onClick={() => handleOpenDialog(null)} data-testid="button-add-product">
