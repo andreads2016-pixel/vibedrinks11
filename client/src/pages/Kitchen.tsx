@@ -40,6 +40,10 @@ export default function Kitchen() {
         playOnce();
         toast({ title: 'Novo pedido na fila!' });
       }
+      if (data.status === 'ready') {
+        playOnce();
+        toast({ title: 'Pedido pronto para entrega!' });
+      }
     },
   });
 

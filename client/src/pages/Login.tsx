@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
-import { Phone, User, MapPin, ArrowRight, Loader2, Lock, AlertTriangle, ChevronDown, Search } from 'lucide-react';
+import { Phone, User, MapPin, ArrowRight, Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth';
 import { apiRequest } from '@/lib/queryClient';
 import logoImage from '@assets/VIBE_DRINKS_1765072715257.png';
-import { DELIVERY_FEE_WARNING } from '@shared/delivery-zones';
-import { fetchNeighborhoodsWithZones, type NeighborhoodWithZone } from '@/lib/delivery-fees';
-import type { DeliveryZone } from '@shared/schema';
+import { NEIGHBORHOODS, DELIVERY_ZONES, DELIVERY_FEE_WARNING, type DeliveryZone as DeliveryZoneType } from '@shared/delivery-zones';
 
 type Step = 'phone' | 'password' | 'register';
 
@@ -32,108 +30,25 @@ export default function Login() {
   const [street, setStreet] = useState('');
   const [number, setNumber] = useState('');
   const [complement, setComplement] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zipCode, setZipCode] = useState('');
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('');
   const [notes, setNotes] = useState('');
-  const [isLoadingCep, setIsLoadingCep] = useState(false);
-  const [neighborhoods, setNeighborhoods] = useState<NeighborhoodWithZone[]>([]);
-  const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState(true);
-  const [neighborhoodSearchQuery, setNeighborhoodSearchQuery] = useState('');
-
-  useEffect(() => {
-    const loadNeighborhoods = async () => {
-      setIsLoadingNeighborhoods(true);
-      const data = await fetchNeighborhoodsWithZones();
-      setNeighborhoods(data);
-      setIsLoadingNeighborhoods(false);
-    };
-    loadNeighborhoods();
-  }, []);
 
   const groupedNeighborhoods = useMemo(() => {
-    const grouped = new Map<string, { zone: DeliveryZone; neighborhoods: NeighborhoodWithZone[] }>();
-    
-    for (const n of neighborhoods) {
-      if (!n.zone) continue;
-      
-      const key = n.zone.id;
-      if (!grouped.has(key)) {
-        grouped.set(key, { zone: n.zone, neighborhoods: [] });
-      }
-      grouped.get(key)!.neighborhoods.push(n);
+    const zones: DeliveryZoneType[] = ['S', 'A', 'B', 'C', 'D'];
+    return zones.map(zone => ({
+      zone,
+      zoneInfo: DELIVERY_ZONES[zone],
+      neighborhoods: NEIGHBORHOODS.filter(n => n.zone === zone)
+    }));
+  }, []);
+
+  const selectedNeighborhoodFee = useMemo(() => {
+    const found = NEIGHBORHOODS.find(n => n.name === selectedNeighborhood);
+    if (found) {
+      return DELIVERY_ZONES[found.zone].fee;
     }
-    
-    return Array.from(grouped.values()).sort((a, b) => 
-      (a.zone.sortOrder ?? 0) - (b.zone.sortOrder ?? 0)
-    );
-  }, [neighborhoods]);
-
-  const formatCep = (value: string) => {
-    const numbers = value.replace(/\D/g, '');
-    if (numbers.length <= 5) return numbers;
-    return `${numbers.slice(0, 5)}-${numbers.slice(5, 8)}`;
-  };
-
-  const fetchAddressByCep = async (cep: string) => {
-    const cleanCep = cep.replace(/\D/g, '');
-    if (cleanCep.length !== 8) return;
-
-    setIsLoadingCep(true);
-    try {
-      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-      const data = await response.json();
-      
-      if (data.erro) {
-        toast({ title: 'CEP nao encontrado', variant: 'destructive' });
-        return;
-      }
-
-      setStreet(data.logradouro || '');
-      setCity(data.localidade || '');
-      setState(data.uf || '');
-      
-      if (data.bairro) {
-        const matchingNeighborhood = neighborhoods.find(
-          n => n.name.toLowerCase() === data.bairro.toLowerCase()
-        );
-        
-        if (matchingNeighborhood) {
-          setSelectedNeighborhoodId(matchingNeighborhood.id);
-          setNeighborhood(matchingNeighborhood.name);
-        } else {
-          setNeighborhood(data.bairro);
-          setSelectedNeighborhoodId('');
-        }
-      }
-      
-      toast({ title: 'Endereco encontrado!' });
-    } catch (error) {
-      toast({ title: 'Erro ao buscar CEP', variant: 'destructive' });
-    } finally {
-      setIsLoadingCep(false);
-    }
-  };
-
-  const handleCepChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCep(e.target.value);
-    setZipCode(formatted);
-    
-    const cleanCep = formatted.replace(/\D/g, '');
-    if (cleanCep.length === 8) {
-      fetchAddressByCep(cleanCep);
-    }
-  };
-
-  const handleNeighborhoodSelect = (neighborhoodId: string) => {
-    setSelectedNeighborhoodId(neighborhoodId);
-    const selected = neighborhoods.find(n => n.id === neighborhoodId);
-    if (selected) {
-      setNeighborhood(selected.name);
-    }
-  };
+    return null;
+  }, [selectedNeighborhood]);
 
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '').slice(0, 11);
@@ -242,8 +157,12 @@ export default function Login() {
       toast({ title: 'Senha invalida', description: 'A senha deve ter 6 digitos', variant: 'destructive' });
       return;
     }
-    if (!street || !number || !neighborhood || !city || !state || !zipCode) {
-      toast({ title: 'Endereco incompleto', description: 'Preencha todos os campos obrigatorios', variant: 'destructive' });
+    if (!selectedNeighborhood) {
+      toast({ title: 'Bairro obrigatorio', description: 'Selecione seu bairro', variant: 'destructive' });
+      return;
+    }
+    if (!street || !number) {
+      toast({ title: 'Endereco incompleto', description: 'Preencha rua e numero', variant: 'destructive' });
       return;
     }
 
@@ -252,7 +171,16 @@ export default function Login() {
       const cleanPhone = whatsapp.replace(/\D/g, '');
       const response = await apiRequest('POST', '/api/auth/register', {
         user: { name, whatsapp: cleanPhone, password },
-        address: { street, number, complement, neighborhood, city, state, zipCode, notes }
+        address: { 
+          street, 
+          number, 
+          complement, 
+          neighborhood: selectedNeighborhood, 
+          city: 'Sao Paulo', 
+          state: 'SP', 
+          zipCode: '', 
+          notes 
+        }
       });
       const data = await response.json();
       
@@ -410,7 +338,7 @@ export default function Login() {
               </div>
 
               <Button
-                variant="link"
+                variant="ghost"
                 className="w-full text-muted-foreground text-sm"
                 onClick={() => {
                   toast({ 
@@ -467,101 +395,45 @@ export default function Login() {
                   Endereco de entrega
                 </Label>
                 
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="relative">
-                    <Input
-                      placeholder="CEP"
-                      value={zipCode}
-                      onChange={handleCepChange}
-                      maxLength={9}
-                      className="bg-secondary border-primary/30 text-foreground"
-                      data-testid="input-zipcode"
-                    />
-                    {isLoadingCep && (
-                      <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />
-                    )}
-                  </div>
-                  <Input
-                    placeholder="Estado"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                    className="bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-state"
-                  />
-                  <Input
-                    placeholder="Cidade"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="bg-secondary border-primary/30 text-foreground"
-                    data-testid="input-city"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">Digite o CEP para preencher automaticamente</p>
-
                 <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Bairro</Label>
-                  {isLoadingNeighborhoods ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm p-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Carregando bairros...
-                    </div>
-                  ) : (
-                    <>
-                      <Select
-                        value={selectedNeighborhoodId}
-                        onValueChange={handleNeighborhoodSelect}
-                      >
-                        <SelectTrigger 
-                          className="bg-secondary border-primary/30"
-                          data-testid="select-neighborhood-register"
-                        >
-                          <SelectValue placeholder="Selecione seu bairro" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groupedNeighborhoods.map(({ zone, neighborhoods: zoneNeighborhoods }) => (
-                            <div key={zone.id}>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
-                                {zone.name} - {formatPrice(Number(zone.fee))}
-                              </div>
-                              {zoneNeighborhoods.map((n) => (
-                                <SelectItem 
-                                  key={n.id} 
-                                  value={n.id}
-                                  data-testid={`option-neighborhood-register-${n.id}`}
-                                >
-                                  {n.name}
-                                </SelectItem>
-                              ))}
-                            </div>
+                  <Label className="text-sm text-muted-foreground">Bairro (Grande Sao Paulo)</Label>
+                  <Select
+                    value={selectedNeighborhood}
+                    onValueChange={setSelectedNeighborhood}
+                  >
+                    <SelectTrigger 
+                      className="bg-secondary border-primary/30"
+                      data-testid="select-neighborhood-register"
+                    >
+                      <SelectValue placeholder="Selecione seu bairro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {groupedNeighborhoods.map(({ zone, zoneInfo, neighborhoods }) => (
+                        <div key={zone}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-secondary/50">
+                            {zoneInfo.name} - {formatPrice(zoneInfo.fee)}
+                          </div>
+                          {neighborhoods.map((n) => (
+                            <SelectItem 
+                              key={n.name} 
+                              value={n.name}
+                              data-testid={`option-neighborhood-${n.name}`}
+                            >
+                              {n.name}
+                            </SelectItem>
                           ))}
-                        </SelectContent>
-                      </Select>
-                      {!selectedNeighborhoodId && neighborhood && (
-                        <p className="text-xs text-yellow flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          Bairro "{neighborhood}" nao encontrado na lista
-                        </p>
-                      )}
-                      {!selectedNeighborhoodId && (
-                        <Input
-                          placeholder="Ou digite o nome do bairro"
-                          value={neighborhood}
-                          onChange={(e) => {
-                            setNeighborhood(e.target.value);
-                            setSelectedNeighborhoodId('');
-                          }}
-                          className="bg-secondary border-primary/30 text-foreground"
-                          data-testid="input-neighborhood-manual"
-                        />
-                      )}
-                    </>
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedNeighborhoodFee !== null && (
+                    <p className="text-sm text-primary">
+                      Taxa de entrega: {formatPrice(selectedNeighborhoodFee)}
+                    </p>
                   )}
                 </div>
                 
-                <div className="flex items-start gap-2 p-3 bg-yellow/10 border border-yellow/30 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-yellow shrink-0 mt-0.5" />
-                  <p className="text-xs text-yellow">{DELIVERY_FEE_WARNING}</p>
-                </div>
+                <p className="text-xs text-muted-foreground">{DELIVERY_FEE_WARNING}</p>
 
                 <div className="grid grid-cols-4 gap-2">
                   <Input
@@ -619,7 +491,7 @@ export default function Login() {
                   {isLoading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    'Cadastrar'
+                    'Criar Conta'
                   )}
                 </Button>
               </div>

@@ -78,7 +78,6 @@ const tabs = [
   { id: 'produtos', label: 'Produtos', icon: ShoppingBag },
   { id: 'categorias', label: 'Categorias', icon: Grid3X3 },
   { id: 'motoboys', label: 'Motoboys', icon: Bike },
-  { id: 'zonas', label: 'Zonas', icon: MapPin },
   { id: 'configuracoes', label: 'Configuracoes', icon: Settings },
 ];
 
@@ -4019,7 +4018,6 @@ export default function AdminDashboard() {
       case 'produtos': return <ProdutosTab />;
       case 'categorias': return <CategoriasTab />;
       case 'motoboys': return <MotoboysTab />;
-      case 'zonas': return <ZonasTab />;
       case 'configuracoes': return <ConfiguracoesTab />;
       default: return <OrdersTab />;
     }
