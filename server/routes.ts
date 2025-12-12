@@ -421,6 +421,43 @@ export async function registerRoutes(
     res.json(products);
   });
 
+  // Export products to CSV (must be before /:id route)
+  app.get("/api/products/export-csv", async (_req, res) => {
+    try {
+      const products = await storage.getProducts();
+      const categories = await storage.getCategories();
+      
+      // Create category map for lookup
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      
+      // CSV header matching import format
+      const header = "Produto,Categoria,PrecoCompra,PrecoVenda,QuantidadeEstoque";
+      
+      // Generate CSV rows
+      const rows = products.map(product => {
+        const categoryName = product.categoryId ? categoryMap.get(product.categoryId) || '' : '';
+        const costPrice = product.costPrice || '0';
+        const salePrice = product.salePrice || '0';
+        const stock = product.stock || 0;
+        
+        // Escape fields that might contain commas
+        const escapedName = product.name.includes(',') ? `"${product.name}"` : product.name;
+        const escapedCategory = categoryName.includes(',') ? `"${categoryName}"` : categoryName;
+        
+        return `${escapedName},${escapedCategory},${costPrice},${salePrice},${stock}`;
+      });
+      
+      const csvContent = [header, ...rows].join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename=produtos.csv');
+      res.send(csvContent);
+    } catch (error: any) {
+      console.error("Error exporting CSV:", error);
+      res.status(500).json({ error: "Erro ao exportar CSV: " + error.message });
+    }
+  });
+
   app.get("/api/products/:id", async (req, res) => {
     const product = await storage.getProduct(req.params.id);
     if (!product) return res.status(404).json({ error: "Product not found" });
@@ -560,43 +597,6 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Error importing CSV:", error);
       res.status(500).json({ error: "Erro ao processar CSV: " + error.message });
-    }
-  });
-
-  // Export products to CSV
-  app.get("/api/products/export-csv", async (_req, res) => {
-    try {
-      const products = await storage.getProducts();
-      const categories = await storage.getCategories();
-      
-      // Create category map for lookup
-      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
-      
-      // CSV header matching import format
-      const header = "Produto,Categoria,PrecoCompra,PrecoVenda,QuantidadeEstoque";
-      
-      // Generate CSV rows
-      const rows = products.map(product => {
-        const categoryName = product.categoryId ? categoryMap.get(product.categoryId) || '' : '';
-        const costPrice = product.costPrice || '0';
-        const salePrice = product.salePrice || '0';
-        const stock = product.stock || 0;
-        
-        // Escape fields that might contain commas
-        const escapedName = product.name.includes(',') ? `"${product.name}"` : product.name;
-        const escapedCategory = categoryName.includes(',') ? `"${categoryName}"` : categoryName;
-        
-        return `${escapedName},${escapedCategory},${costPrice},${salePrice},${stock}`;
-      });
-      
-      const csvContent = [header, ...rows].join('\n');
-      
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename=produtos.csv');
-      res.send(csvContent);
-    } catch (error: any) {
-      console.error("Error exporting CSV:", error);
-      res.status(500).json({ error: "Erro ao exportar CSV: " + error.message });
     }
   });
 
